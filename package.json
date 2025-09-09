@@ -1,6 +1,7 @@
 {
   "name": "wpp-bot",
   "version": "1.0.0",
+  "type": "module",
   "description": "Bot WhatsApp com GPT, Twilio, Supabase e Mercado Pago",
   "main": "index.js",
   "scripts": {
@@ -16,3 +17,4 @@
     "openai": "^4.30.0"
   }
 }
+
