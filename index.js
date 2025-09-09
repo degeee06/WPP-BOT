@@ -5,7 +5,6 @@ import bodyParser from "body-parser";
 import { createClient } from "@supabase/supabase-js";
 import { OpenAI } from "openai";
 import Twilio from "twilio";
-import axios from "axios";
 
 dotenv.config();
 const app = express();
@@ -38,6 +37,23 @@ app.post("/webhook", async (req, res) => {
   try {
     const msgFrom = req.body.From;
     const msgBody = req.body.Body;
+
+    // Tenta inserir novo lead (se não existir)
+    const emailMatch = msgBody.match(/[\w.-]+@[\w.-]+\.\w+/);
+    const email = emailMatch ? emailMatch[0] : null;
+
+    if (email) {
+      await supabase
+        .from("leads")
+        .insert({
+          name: "Cliente WhatsApp",
+          phone: msgFrom,
+          email: email,
+          message: msgBody
+        })
+        .onConflict("email")
+        .ignore(); // não duplica leads
+    }
 
     // Gera resposta do GPT
     const gptResponse = await openai.chat.completions.create({
@@ -81,6 +97,23 @@ app.post("/mp-webhook", async (req, res) => {
         .eq("email", payerEmail);
 
       if (error) console.error("Erro ao atualizar Supabase:", error);
+
+      // Envia mensagem de confirmação via WhatsApp
+      if (payerEmail) {
+        const { data: lead } = await supabase
+          .from("leads")
+          .select("phone")
+          .eq("email", payerEmail)
+          .single();
+
+        if (lead?.phone) {
+          await client.messages.create({
+            from: TWILIO_NUMBER,
+            to: lead.phone,
+            body: "Pagamento recebido com sucesso! ✅ Obrigado pelo seu Pix."
+          });
+        }
+      }
     }
 
     res.sendStatus(200);
