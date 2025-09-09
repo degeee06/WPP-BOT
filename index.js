@@ -36,10 +36,10 @@ app.get("/", (req, res) => {
 app.post("/webhook", async (req, res) => {
   try {
     const msgFrom = req.body.From;
-    const msgBody = req.body.Body;
+    const msgBody = req.body.Body || req.body.body || "";
 
-    // Tenta inserir novo lead (se não existir)
-    const emailMatch = msgBody.match(/[\w.-]+@[\w.-]+\.\w+/);
+    // Evita erro se msgBody estiver vazio
+    const emailMatch = msgBody ? msgBody.match(/[\w.-]+@[\w.-]+\.\w+/) : null;
     const email = emailMatch ? emailMatch[0] : null;
 
     if (email) {
@@ -52,10 +52,10 @@ app.post("/webhook", async (req, res) => {
           message: msgBody
         })
         .onConflict("email")
-        .ignore(); // não duplica leads
+        .ignore();
     }
 
-    // Gera resposta do GPT
+    // Resposta GPT
     const gptResponse = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: msgBody }],
@@ -63,7 +63,6 @@ app.post("/webhook", async (req, res) => {
 
     const reply = gptResponse.choices[0].message.content;
 
-    // Envia resposta para WhatsApp
     await client.messages.create({
       from: TWILIO_NUMBER,
       to: msgFrom,
@@ -76,6 +75,7 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
 
 // Webhook Mercado Pago
 app.post("/mp-webhook", async (req, res) => {
@@ -126,3 +126,4 @@ app.post("/mp-webhook", async (req, res) => {
 // -------------------- Servidor --------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
