@@ -17,17 +17,17 @@ const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 const TWILIO_NUMBER = "whatsapp:+14155238886"; // use seu sandbox com whatsapp:
 
 // -------------------- Hugging Face (leve) --------------------
-async function gerarRespostaHF(prompt) {
+async function gerarResposta(prompt) {
   try {
     const res = await axios.post(
-      "https://api-inference.huggingface.co/models/google/flan-t5-base", // <- modelo alternativo
+      'https://api-inference.huggingface.co/models/openai/gpt-oss-20b',
       { inputs: prompt },
-      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` }, timeout: 15000 }
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
-    return res.data[0]?.generated_text || "🤖 Não consegui gerar resposta.";
+    return res.data[0]?.generated_text || 'Não consegui entender sua mensagem.';
   } catch (err) {
-    console.error("Erro Hugging Face:", err.response?.data || err.message);
-    return "🤖 Ocorreu um erro ao gerar a resposta.";
+    console.error('Erro ao gerar resposta:', err);
+    return 'Ocorreu um erro ao processar sua solicitação.';
   }
 }
 
@@ -64,4 +64,5 @@ app.post("/webhook", async (req, res) => {
 // -------------------- Servidor --------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
 
