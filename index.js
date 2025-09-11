@@ -14,7 +14,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // -------------------- Twilio --------------------
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+const TWILIO_NUMBER = "whatsapp:+14155238886"; // use seu sandbox com whatsapp:
 
 // -------------------- Hugging Face (leve) --------------------
 async function gerarRespostaHF(prompt) {
