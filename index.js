@@ -3,21 +3,37 @@ import express from "express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import Twilio from "twilio";
+import axios from "axios";
 
 dotenv.config();
 const app = express();
+
+// Suporte para JSON e x-www-form-urlencoded (Twilio envia assim)
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // -------------------- Twilio --------------------
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 
-// -------------------- Rotas --------------------
+// -------------------- Hugging Face (leve) --------------------
+async function gerarRespostaHF(prompt) {
+  try {
+    const res = await axios.post(
+      "https://api-inference.huggingface.co/models/google/flan-t5-small",
+      { inputs: prompt },
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` }, timeout: 15000 }
+    );
+    return res.data[0]?.generated_text || "🤖 Não consegui gerar resposta.";
+  } catch (err) {
+    console.error("Erro Hugging Face:", err.response?.data || err.message);
+    return "🤖 Ocorreu um erro ao gerar a resposta.";
+  }
+}
 
-// Teste do bot
+// -------------------- Rotas --------------------
 app.get("/", (req, res) => res.send("Bot rodando ✅"));
 
-// Webhook Twilio (WhatsApp)
 app.post("/webhook", async (req, res) => {
   try {
     const msgFrom = req.body.From;
@@ -27,8 +43,8 @@ app.post("/webhook", async (req, res) => {
 
     if (!msgFrom) return res.sendStatus(400);
 
-    // Resposta fixa apenas para teste
-    const reply = "🤖 Recebi sua mensagem! Em breve a IA vai responder aqui.";
+    // Gera resposta via IA
+    const reply = await gerarRespostaHF(msgBody);
 
     // Envia mensagem de volta
     await client.messages.create({
