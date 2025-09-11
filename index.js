@@ -9,7 +9,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 // OpenRouter config
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_NAME = "deepseek/chat-v3-0324:free"; // exemplo de modelo grátis em 2025
+const MODEL_NAME = "deepseek/deepseek-r1:free"; // exemplo de modelo grátis em 2025
 
 // Respostas fixas (fallback se não usar IA)
 const responses = {
@@ -80,3 +80,4 @@ app.post("/whatsapp", async (req, res) => {
 // Inicia servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🤖 Bot rodando na porta ${PORT}`));
+
