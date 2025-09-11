@@ -20,7 +20,7 @@ const TWILIO_NUMBER = "whatsapp:+14155238886"; // Sandbox Twilio WhatsApp
 async function gerarResposta(prompt) {
   try {
     const res = await axios.post(
-      'https://api-inference.huggingface.co/models/gpt2', // modelo leve gratuito
+       'https://api-inference.huggingface.co/models/bigscience/bloomz-560m', // modelo leve gratuito
       { inputs: prompt },
       { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
@@ -71,3 +71,4 @@ app.post("/webhook", async (req, res) => {
 // -------------------- Servidor --------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
