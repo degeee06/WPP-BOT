@@ -1,11 +1,11 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const twilio = require("twilio");
+import express from "express";
+import bodyParser from "body-parser";
+import twilio from "twilio";
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Respostas iguais às do seu HTML
+// Respostas do bot (as mesmas do seu HTML)
 const responses = {
   "produto": "Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo?",
   "catalogo": "Aqui está nosso catálogo: [link do catálogo]. Posso te ajudar com mais alguma coisa?",
@@ -22,9 +22,10 @@ const responses = {
   "default": "Desculpe, não entendi. Poderia reformular sua pergunta?"
 };
 
-// Função para processar mensagens
+// Função para processar mensagem recebida
 function getResponse(msg) {
   msg = msg.toLowerCase();
+
   if (msg.includes("produto") || msg.includes("catálogo")) return responses.produto;
   if (msg.includes("catalogo")) return responses.catalogo;
   if (msg.includes("preço") || msg.includes("valor")) return responses.preço;
@@ -35,10 +36,11 @@ function getResponse(msg) {
   if (msg.includes("contato") || msg.includes("whatsapp") || msg.includes("telefone") || msg.includes("número") || msg.includes("numero")) return responses.whatsapp;
   if (msg.includes("ajuda") || msg.includes("suporte") || msg.includes("emergência") || msg.includes("emergencia")) return responses.ajuda;
   if (msg.includes("horário") || msg.includes("horario") || msg.includes("atendimento") || msg.includes("funcionamento")) return responses.horario;
+
   return responses.default;
 }
 
-// Rota para receber mensagens do Twilio
+// Endpoint do Twilio para WhatsApp
 app.post("/whatsapp", (req, res) => {
   const incomingMsg = req.body.Body || "";
   const reply = getResponse(incomingMsg);
@@ -52,4 +54,4 @@ app.post("/whatsapp", (req, res) => {
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Bot rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Bot rodando na porta ${PORT}`));
