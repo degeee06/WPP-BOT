@@ -54,7 +54,7 @@ app.post("/whatsapp", async (req, res) => {
 
       // Envia via Twilio (mensagem interativa)
       await client.messages.create({
-        from: process.env.TWILIO_WHATSAPP_NUMBER,
+        from: process.env.whatsapp:+14155238886,
         to: from,
         content: JSON.stringify(message)
       });
@@ -75,3 +75,4 @@ app.post("/whatsapp", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
