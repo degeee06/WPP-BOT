@@ -20,7 +20,7 @@ const TWILIO_NUMBER = "whatsapp:+14155238886"; // use seu sandbox com whatsapp:
 async function gerarRespostaHF(prompt) {
   try {
     const res = await axios.post(
-      "https://api-inference.huggingface.co/models/google/flan-t5-small",
+      "https://api-inference.huggingface.co/models/google/flan-t5-base", // <- modelo alternativo
       { inputs: prompt },
       { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` }, timeout: 15000 }
     );
@@ -30,6 +30,7 @@ async function gerarRespostaHF(prompt) {
     return "🤖 Ocorreu um erro ao gerar a resposta.";
   }
 }
+
 
 // -------------------- Rotas --------------------
 app.get("/", (req, res) => res.send("Bot rodando ✅"));
@@ -63,3 +64,4 @@ app.post("/webhook", async (req, res) => {
 // -------------------- Servidor --------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
