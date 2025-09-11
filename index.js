@@ -23,11 +23,11 @@ app.use(express.static(path.join(__dirname, "public")));
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_NUMBER = process.env.TWILIO_NUMBER || "whatsapp:+14155238886";
 
-// -------------------- Hugging Face --------------------
+// -------------------- Hugging Face Falcon-7B-Instruct --------------------
 async function gerarResposta(prompt) {
   try {
     const res = await axios.post(
-      'https://api-inference.huggingface.co/models/bigscience/bloomz-560m', // modelo gratuito
+      "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct",
       { inputs: prompt },
       { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
@@ -37,20 +37,22 @@ async function gerarResposta(prompt) {
     } else if (res.data?.generated_text) {
       return res.data.generated_text;
     } else {
-      return 'Desculpe, não consegui entender sua mensagem.';
+      return "Desculpe, não consegui entender sua mensagem.";
     }
   } catch (err) {
-    console.error('Erro ao gerar resposta:', err.response?.data || err.message);
-    return 'Ocorreu um erro ao processar sua solicitação.';
+    console.error("Erro ao gerar resposta:", err.response?.data || err.message);
+    return "Ocorreu um erro ao processar sua solicitação.";
   }
 }
 
 // -------------------- Rotas --------------------
+
+// Serve o front-end
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public/index.html"));
 });
 
-// Rota para front-end
+// API para front-end enviar mensagem
 app.post("/chat", async (req, res) => {
   try {
     const { message } = req.body;
