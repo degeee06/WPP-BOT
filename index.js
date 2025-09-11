@@ -5,94 +5,97 @@ import twilio from "twilio";
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Configurações do Twilio
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-
-// Estrutura do menu
-const mainMenu = `
-Olá! Bem-vindo(a) ao atendimento. Escolha uma opção digitando o número correspondente:
+// -----------------------------
+// Respostas e menus do bot
+// -----------------------------
+const responses = {
+  "menu_principal": `Olá! Escolha uma opção:
 1️⃣ Produtos
 2️⃣ Serviços
-3️⃣ Pagamento
-4️⃣ Falar com atendente
-`;
+3️⃣ Promoções
+4️⃣ Pagamento
+5️⃣ Contato/Atendimento humano`,
+  "produtos": `Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo? [link do catálogo]`,
+  "servicos": `Nossos serviços disponíveis:
+- Cromoterapia
+- Massagem Relaxante
+- Design de Unhas
+Digite o serviço que deseja saber mais ou 'menu' para voltar.`,
+  "promocoes": `Temos promoções especiais esta semana! Produtos com até 30% OFF, serviços com 10% de desconto.`,
+  "pagamento": `Aceitamos PIX, cartão e boleto. Quer gerar pagamento via PIX?`,
+  "contato": `Você pode falar diretamente com nosso atendente pelo WhatsApp: https://wa.me/5511999999999`,
+  "default": `Desculpe, não entendi. Digite 'menu' para ver as opções disponíveis.`
+};
 
-const servicesMenu = `
-Nossos serviços disponíveis:
-1️⃣ Massagem Relaxante
-2️⃣ Cromoterapia
-3️⃣ Design de Unhas
-0️⃣ Voltar ao menu principal
-`;
+// -----------------------------
+// Armazena o estado de cada usuário
+// -----------------------------
+const userState = {}; // chave = número do WhatsApp
 
-const productsMenu = `
-Temos vários produtos disponíveis. Quer ver nossos catálogos?
-1️⃣ Catálogo de Produtos
-2️⃣ Catálogo de Serviços
-0️⃣ Voltar ao menu principal
-`;
+// -----------------------------
+// Função para processar a mensagem
+// -----------------------------
+function getResponse(from, msg) {
+  msg = msg.toLowerCase().trim();
 
-const paymentMenu = `
-Aceitamos várias formas de pagamento:
-1️⃣ PIX
-2️⃣ Cartão de Crédito
-3️⃣ Boleto
-0️⃣ Voltar ao menu principal
-`;
+  // Se usuário pedir menu ou reset
+  if (msg === "menu") {
+    userState[from] = "menu_principal";
+    return responses.menu_principal;
+  }
 
-// Função que processa mensagens
-function processMessage(msg) {
-  msg = msg.trim();
+  // Checa estado atual do usuário
+  const state = userState[from] || "menu_principal";
 
-  // Menu inicial
-  if (msg === "menu" || msg === "0") return mainMenu;
+  switch (state) {
+    case "menu_principal":
+      if (msg === "1" || msg.includes("produto")) {
+        userState[from] = "produtos";
+        return responses.produtos;
+      } else if (msg === "2" || msg.includes("serviço") || msg.includes("servico")) {
+        userState[from] = "servicos";
+        return responses.servicos;
+      } else if (msg === "3" || msg.includes("promoção") || msg.includes("promocao")) {
+        userState[from] = "promocoes";
+        return responses.promocoes;
+      } else if (msg === "4" || msg.includes("pagamento")) {
+        userState[from] = "pagamento";
+        return responses.pagamento;
+      } else if (msg === "5" || msg.includes("contato") || msg.includes("atendimento")) {
+        userState[from] = "contato";
+        return responses.contato;
+      } else {
+        return responses.default;
+      }
 
-  // Menu principal
-  if (msg === "1") return productsMenu;
-  if (msg === "2") return servicesMenu;
-  if (msg === "3") return paymentMenu;
-  if (msg === "4") return `Você será direcionado para um atendente humano: https://wa.me/5511999999999`;
+    case "produtos":
+    case "servicos":
+    case "promocoes":
+    case "pagamento":
+    case "contato":
+      // Sempre permite voltar ao menu principal
+      if (msg === "menu") {
+        userState[from] = "menu_principal";
+        return responses.menu_principal;
+      } else {
+        // Para qualquer outra mensagem, mantém o estado atual
+        return `Para voltar ao menu, digite 'menu'.`;
+      }
 
-  // Submenu serviços
-  if (msg === "1" && lastMenu === "services") return `Massagem Relaxante: Sessões de 50 ou 80 minutos com técnicas suecas e aromaterapia.`;
-  if (msg === "2" && lastMenu === "services") return `Cromoterapia: Equilíbrio energético através das cores. Sessões de 30 a 60 minutos.`;
-  if (msg === "3" && lastMenu === "services") return `Design de Unhas: Alongamento, manicure, pedicure e decoração artística.`;
-
-  // Submenu produtos
-  if (msg === "1" && lastMenu === "products") return `Catálogo de Produtos: [link do catálogo]`;
-  if (msg === "2" && lastMenu === "products") return `Catálogo de Serviços: [link do catálogo]`;
-
-  // Submenu pagamento
-  if (msg === "1" && lastMenu === "payment") return `PIX selecionado. Você receberá instruções para pagamento.`;
-  if (msg === "2" && lastMenu === "payment") return `Cartão de Crédito selecionado. Pagamento seguro via link.`;
-  if (msg === "3" && lastMenu === "payment") return `Boleto selecionado. Você receberá o boleto para pagamento.`;
-
-  return `Desculpe, não entendi. Digite "menu" para voltar ao início.`;
+    default:
+      userState[from] = "menu_principal";
+      return responses.menu_principal;
+  }
 }
 
-// Armazena em memória simples o último menu do usuário
-const userState = {};
-let lastMenu = null;
-
-// Endpoint Twilio → WhatsApp
-app.post("/whatsapp", async (req, res) => {
-  const from = req.body.From;
+// -----------------------------
+// Endpoint do Twilio para WhatsApp
+// -----------------------------
+app.post("/whatsapp", (req, res) => {
   const incomingMsg = req.body.Body || "";
+  const from = req.body.From || "";
 
-  // Determina menu atual
-  if (!userState[from]) userState[from] = "main";
-  lastMenu = userState[from];
-
-  // Define próximo menu
-  if (incomingMsg === "1" && lastMenu === "2") userState[from] = "products";
-  else if (incomingMsg === "2" && lastMenu === "2") userState[from] = "services";
-  else if (incomingMsg === "3" && lastMenu === "2") userState[from] = "payment";
-  else if (incomingMsg === "0") userState[from] = "main";
-  else userState[from] = lastMenu;
-
-  const reply = processMessage(incomingMsg);
+  const reply = getResponse(from, incomingMsg);
 
   const twiml = new twilio.twiml.MessagingResponse();
   twiml.message(reply);
@@ -101,6 +104,8 @@ app.post("/whatsapp", async (req, res) => {
   res.end(twiml.toString());
 });
 
-// Inicia servidor
+// -----------------------------
+// Iniciar servidor
+// -----------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🤖 Bot rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Bot rodando na porta ${PORT}`));
