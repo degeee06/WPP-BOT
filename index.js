@@ -14,23 +14,23 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // -------------------- Twilio --------------------
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const TWILIO_NUMBER = "whatsapp:+14155238886"; // use seu sandbox com whatsapp:
+const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 
-// -------------------- Hugging Face (leve) --------------------
+// -------------------- Hugging Face GPT-OSS-20B --------------------
 async function gerarResposta(prompt) {
   try {
     const res = await axios.post(
-      'https://api-inference.huggingface.co/models/openai/gpt-oss-20b',
+      "https://api-inference.huggingface.co/models/openai/gpt-oss-20b",
       { inputs: prompt },
-      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` }, timeout: 30000 }
     );
-    return res.data[0]?.generated_text || 'Não consegui entender sua mensagem.';
+    console.log("Resposta HF raw:", res.data);
+    return res.data[0]?.generated_text || "🤖 Não consegui gerar resposta.";
   } catch (err) {
-    console.error('Erro ao gerar resposta:', err);
-    return 'Ocorreu um erro ao processar sua solicitação.';
+    console.error("Erro Hugging Face:", err.response?.data || err.message);
+    return "🤖 Ocorreu um erro ao gerar a resposta.";
   }
 }
-
 
 // -------------------- Rotas --------------------
 app.get("/", (req, res) => res.send("Bot rodando ✅"));
@@ -44,8 +44,8 @@ app.post("/webhook", async (req, res) => {
 
     if (!msgFrom) return res.sendStatus(400);
 
-    // Gera resposta via IA
-    const reply = await gerarRespostaHF(msgBody);
+    // Gera resposta via GPT-OSS-20B
+    const reply = await gerarResposta(msgBody);
 
     // Envia mensagem de volta
     await client.messages.create({
@@ -64,5 +64,3 @@ app.post("/webhook", async (req, res) => {
 // -------------------- Servidor --------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
-
-
