@@ -9,9 +9,9 @@ app.use(bodyParser.urlencoded({ extended: false }));
 // OpenRouter config
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_NAME = "deepseek/deepseek-r1:free"; // modelo grátis 2025
+const MODEL_NAME = "deepseek/deepseek-r1:free";
 
-// Respostas fixas (copiadas do seu HTML)
+// Respostas fixas do bot
 const responses = {
   "produto": "Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo?",
   "catalogo": "Aqui está nosso catálogo: [link do catálogo]. Posso te ajudar com mais alguma coisa?",
@@ -32,6 +32,20 @@ const responses = {
 function getResponse(msg) {
   msg = msg.toLowerCase();
 
+  // Pergunta sobre data
+  if (msg.includes("que dia é hoje") || msg.includes("data de hoje")) {
+    const hoje = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return `Hoje é ${hoje.toLocaleDateString('pt-BR', options)}. 😊`;
+  }
+
+  // Pergunta sobre hora
+  if (msg.includes("que horas") || msg.includes("hora")) {
+    const agora = new Date();
+    return `Agora são ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. ⏰`;
+  }
+
+  // Respostas fixas
   if (msg.includes("produto") || msg.includes("catálogo")) return responses.produto;
   if (msg.includes("catalogo")) return responses.catalogo;
   if (msg.includes("preço") || msg.includes("valor")) return responses.preço;
@@ -49,6 +63,13 @@ function getResponse(msg) {
 // Função para consultar IA via OpenRouter
 async function queryLLM(userMessage) {
   try {
+    const prompt = `
+Você é um assistente virtual de atendimento da empresa XYZ.
+Responda de forma amigável, clara e curta, usando emojis quando apropriado.
+Sempre verifique se a pergunta não se encaixa em respostas fixas antes de inventar algo.
+Se não souber a resposta, sugira falar com um atendente humano via WhatsApp.
+Pergunta do usuário: "${userMessage}"
+`;
     const res = await fetch(OPENROUTER_ENDPOINT, {
       method: "POST",
       headers: {
@@ -57,7 +78,7 @@ async function queryLLM(userMessage) {
       },
       body: JSON.stringify({
         model: MODEL_NAME,
-        messages: [{ role: "user", content: userMessage }]
+        messages: [{ role: "user", content: prompt }]
       })
     });
 
@@ -87,7 +108,25 @@ app.post("/whatsapp", async (req, res) => {
   }
 
   const twiml = new twilio.twiml.MessagingResponse();
-  twiml.message(reply);
+
+  // Se a mensagem do usuário for sobre produtos ou catálogo, envia botões interativos
+  if (incomingMsg.toLowerCase().includes("produto") || incomingMsg.toLowerCase().includes("catálogo")) {
+    const message = twiml.message();
+    message.body(reply);
+
+    message.interactive({
+      type: "button",
+      body: { text: "Escolha uma opção:" },
+      action: {
+        buttons: [
+          { type: "reply", reply: { id: "ver_catalogo", title: "📄 Ver Catálogo" } },
+          { type: "reply", reply: { id: "falar_atendente", title: "💬 Falar com Humano" } }
+        ]
+      }
+    });
+  } else {
+    twiml.message(reply);
+  }
 
   res.writeHead(200, { "Content-Type": "text/xml" });
   res.end(twiml.toString());
