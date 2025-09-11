@@ -10,43 +10,67 @@ app.use(bodyParser.json());
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+const menuOptions = [
+  { id: "produto", title: "Produtos/Catálogo" },
+  { id: "preco", title: "Preços e Valores" },
+  { id: "desconto", title: "Descontos e Promoções" },
+  { id: "pagamento", title: "Formas de Pagamento" },
+  { id: "entrega", title: "Prazos de Entrega" },
+  { id: "garantia", title: "Garantia dos Produtos" },
+  { id: "contato", title: "Contato/WhatsApp" },
+  { id: "horario", title: "Horário de Atendimento" }
+];
+
 const responses = {
-    "menu": `Olá! Sou o assistente virtual da empresa. Selecione uma opção digitando o número:
-1️⃣ Produtos/Catálogo
-2️⃣ Preços e Valores
-3️⃣ Descontos e Promoções
-4️⃣ Formas de Pagamento
-5️⃣ Prazos de Entrega
-6️⃣ Garantia dos Produtos
-7️⃣ Contato/WhatsApp
-8️⃣ Horário de Atendimento`,
-    "1": "Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo?",
-    "2": "Os preços variam conforme o produto. Qual item você está interessado?",
-    "3": "Temos promoções especiais esta semana! Me diga qual produto te interessa.",
-    "4": "Aceitamos várias formas de pagamento, incluindo PIX, cartão e boleto.",
-    "5": "O prazo de entrega é de 3 a 5 dias úteis após a confirmação do pagamento.",
-    "6": "Todos nossos produtos possuem garantia de 12 meses contra defeitos de fabricação.",
-    "7": "Você pode falar diretamente conosco pelo WhatsApp: (11) 99999-9999",
-    "8": "Nosso horário de atendimento é de segunda a sábado, das 08:00 às 19:00 horas.",
-    "default": "Desculpe, não entendi. Digite 'menu' para ver as opções novamente."
+  "produto": "Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo?",
+  "preco": "Os preços variam conforme o produto. Qual item você está interessado?",
+  "desconto": "Temos promoções especiais esta semana! Me diga qual produto te interessa.",
+  "pagamento": "Aceitamos PIX, cartão e boleto.",
+  "entrega": "O prazo de entrega é de 3 a 5 dias úteis após a confirmação do pagamento.",
+  "garantia": "Todos nossos produtos possuem garantia de 12 meses contra defeitos de fabricação.",
+  "contato": "Você pode falar conosco pelo WhatsApp: (11) 99999-9999",
+  "horario": "Nosso horário de atendimento é de segunda a sábado, das 08:00 às 19:00 horas."
 };
 
 // Endpoint para WhatsApp
 app.post("/whatsapp", async (req, res) => {
-    const incomingMsg = (req.body.Body || "").trim().toLowerCase();
-    const from = req.body.From;
+  const from = req.body.From;
+  const body = req.body.Body || "";
+  
+  // Se a mensagem é inicial ou qualquer texto, envia menu interativo
+  if (!responses[body.toLowerCase()]) {
+    try {
+      const buttons = menuOptions.slice(0, 3).map(opt => ({ type: "reply", reply: { id: opt.id, title: opt.title } }));
+      const message = {
+        from: process.env.TWILIO_WHATSAPP_NUMBER,
+        to: from,
+        contentType: "application/json",
+        interactive: {
+          type: "button",
+          body: { text: "Olá! Sou o assistente virtual. Selecione uma opção:" },
+          action: { buttons }
+        }
+      };
 
-    let reply = responses["default"];
+      // Envia via Twilio (mensagem interativa)
+      await client.messages.create({
+        from: process.env.TWILIO_WHATSAPP_NUMBER,
+        to: from,
+        content: JSON.stringify(message)
+      });
+    } catch (err) {
+      console.error(err);
+    }
+    return res.sendStatus(200);
+  }
 
-    // Exibir menu se digitar "menu"
-    if (incomingMsg === "menu") reply = responses["menu"];
-    else if (["1","2","3","4","5","6","7","8"].includes(incomingMsg)) reply = responses[incomingMsg];
+  // Resposta padrão quando o usuário clica
+  const replyText = responses[body.toLowerCase()];
+  const twiml = new twilio.twiml.MessagingResponse();
+  twiml.message(replyText);
 
-    const twiml = new twilio.twiml.MessagingResponse();
-    twiml.message(reply);
-
-    res.set("Content-Type", "text/xml");
-    res.send(twiml.toString());
+  res.set("Content-Type", "text/xml");
+  res.send(twiml.toString());
 });
 
 const PORT = process.env.PORT || 3000;
