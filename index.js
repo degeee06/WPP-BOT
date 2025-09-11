@@ -9,7 +9,6 @@ app.use(bodyParser.urlencoded({ extended: false }));
 const responses = {
   "servicos": "Nossos serviços disponíveis são: Cromoterapia, Massagem Relaxante, Design de Unhas e Tratamentos Corporais.",
   "produto": "Temos diversos produtos disponíveis. Quer ver nosso catálogo?",
-  "catalogo": "Temos vários catálogos disponíveis:<br>- Catálogo de Produtos: [link]<br>- Catálogo de Serviços: [link]",
   "cromoterapia": "A cromoterapia utiliza cores para restaurar o equilíbrio energético do corpo. Sessões de 30 a 60 minutos.",
   "massagem": "Nossa massagem relaxante combina técnicas suecas e aromaterapia para aliviar tensões. Sessões de 50 ou 80 minutos.",
   "unhas": "Oferecemos serviços de unhas: Alongamento, Manicure, Pedicure, Esmaltação em gel e Decoração artística. Pacotes mensais com desconto disponíveis.",
@@ -66,3 +65,4 @@ app.post("/whatsapp", (req, res) => {
 // Inicia servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🤖 Bot rodando na porta ${PORT}`));
+
