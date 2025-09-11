@@ -20,21 +20,19 @@ const supabase = createClient(
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 
-// -------------------- Hugging Face --------------------
+// -------------------- Hugging Face (leve e grátis) --------------------
 async function gerarRespostaHF(prompt) {
   try {
     const res = await axios.post(
-      "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct",
+      "https://api-inference.huggingface.co/models/google/flan-t5-small",
       { inputs: prompt },
-      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
+      {
+        headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` },
+        timeout: 15000 // 15s limite
+      }
     );
-
-    // Alguns modelos retornam array ou objeto
-    if (res.data?.generated_text) return res.data.generated_text;
-    if (Array.isArray(res.data) && res.data[0]?.generated_text)
-      return res.data[0].generated_text;
-
-    return "🤖 Não consegui gerar resposta.";
+    // Flan-T5 retorna array de objetos
+    return res.data[0]?.generated_text || "🤖 Não consegui gerar resposta.";
   } catch (err) {
     console.error("Erro Hugging Face:", err.response?.data || err.message);
     return "🤖 Ocorreu um erro ao gerar a resposta.";
@@ -42,22 +40,14 @@ async function gerarRespostaHF(prompt) {
 }
 
 // -------------------- Rotas --------------------
-
-// Teste do bot
 app.get("/", (req, res) => res.send("Bot rodando ✅"));
 
-// Webhook Twilio (WhatsApp)
 app.post("/webhook", async (req, res) => {
   try {
     const msgFrom = req.body.From;
     const msgBody = req.body.Body || "";
+    if (!msgFrom) return res.sendStatus(400);
 
-    if (!msgFrom) {
-      console.error("Número do destinatário (msgFrom) não encontrado!");
-      return res.sendStatus(400);
-    }
-
-    // Pega ou cria lead
     let { data: lead } = await supabase
       .from("leads")
       .select("*")
@@ -82,9 +72,7 @@ app.post("/webhook", async (req, res) => {
       lead = newLead || { msg_count: 0, last_msg_date: hoje };
     }
 
-    // Reset diário
-    const lastMsgDate = lead.last_msg_date || hoje;
-    if (lastMsgDate !== hoje) {
+    if (lead.last_msg_date !== hoje) {
       await supabase
         .from("leads")
         .update({ msg_count: 0, last_msg_date: hoje })
@@ -92,30 +80,23 @@ app.post("/webhook", async (req, res) => {
       lead.msg_count = 0;
     }
 
-    // Limite diário para não-pagos
     if (!lead.paid && lead.msg_count >= 10) {
       await client.messages.create({
         from: TWILIO_NUMBER,
         to: msgFrom,
-        body:
-          "🚀 Você atingiu o limite diário de 10 mensagens grátis.\n\n" +
-          "👉 Para desbloquear uso ilimitado, faça o upgrade para o plano VIP: \n" +
-          process.env.MP_PAYMENT_LINK
+        body: `🚀 Limite diário de 10 mensagens grátis atingido.\nUpgrade VIP: ${process.env.MP_PAYMENT_LINK}`
       });
       return res.sendStatus(200);
     }
 
-    // Resposta IA Hugging Face
     const reply = await gerarRespostaHF(msgBody);
 
-    // Envia mensagem
     await client.messages.create({
       from: TWILIO_NUMBER,
       to: msgFrom,
       body: reply,
     });
 
-    // Atualiza contador
     await supabase
       .from("leads")
       .update({ msg_count: (lead.msg_count || 0) + 1 })
@@ -128,43 +109,29 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// Webhook Mercado Pago
 app.post("/mp-webhook", async (req, res) => {
   try {
-    const tokenRecebido = req.query.token;
-    if (tokenRecebido !== process.env.MP_WEBHOOK_TOKEN) return res.status(403).send("Forbidden");
+    if (req.query.token !== process.env.MP_WEBHOOK_TOKEN) return res.status(403).send("Forbidden");
 
     const data = req.body;
-
     if (data.type === "payment" || data.type === "preapproval") {
       const payerEmail = data.data?.payer?.email || data.data?.payer_email;
-
-      // Atualiza lead no Supabase
-      const { error } = await supabase
-        .from("leads")
-        .update({ paid: true })
-        .eq("email", payerEmail);
-
-      if (error) console.error("Erro ao atualizar Supabase:", error);
-
-      // Envia confirmação WhatsApp
       if (payerEmail) {
+        await supabase.from("leads").update({ paid: true }).eq("email", payerEmail);
         const { data: lead } = await supabase
           .from("leads")
           .select("phone")
           .eq("email", payerEmail)
           .maybeSingle();
-
         if (lead?.phone) {
           await client.messages.create({
             from: TWILIO_NUMBER,
             to: lead.phone,
-            body: "Pagamento recebido com sucesso! ✅ Obrigado pelo seu Pix."
+            body: "Pagamento recebido ✅ Obrigado pelo Pix!"
           });
         }
       }
     }
-
     res.sendStatus(200);
   } catch (err) {
     console.error("Erro webhook MP:", err);
