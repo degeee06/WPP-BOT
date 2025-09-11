@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Empresarial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .chat-container {
+            height: calc(100vh - 160px);
+        }
+        .message-bubble {
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #9CA3AF;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white p-4 shadow-md">
+            <div class="container mx-auto flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-feather="message-square" class="w-6 h-6"></i>
+                    <h1 class="text-xl font-bold">Assistente Virtual</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm">Suporte 24/7</span>
+                    <i data-feather="info" class="w-5 h-5 cursor-pointer"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <main class="flex-grow container mx-auto p-4">
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden h-full flex flex-col">
+                <!-- Chat Messages -->
+                <div class="chat-container p-4 overflow-y-auto" id="chat-messages">
+                    <!-- Welcome Message -->
+                    <div class="mb-4 flex justify-start" data-aos="fade-right">
+                        <div class="bg-blue-100 text-blue-800 p-3 rounded-lg message-bubble">
+                            <p class="font-medium">Olá!  👋</p>
+                            <p>Eu sou o assistente virtual da empresa. Como posso te ajudar hoje?</p>
+                            <div class="mt-2">
+                                <p class="text-sm text-blue-600">Você pode perguntar sobre:</p>
+                                <ul class="list-disc list-inside text-sm">
+                                    <li>Horário de funcionamento</li>
+                                    <li>Produtos e serviços</li>
+                                    <li>Suporte técnico</li>
+                                    <li>Informações de contato</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Typing Indicator (Hidden by default) -->
+                <div class="px-4 py-2 hidden" id="typing-indicator">
+                    <div class="flex items-center">
+                        <div class="bg-gray-200 text-gray-800 p-2 rounded-lg message-bubble">
+                            <div class="typing-indicator flex">
+                                <span class="animate-pulse" style="animation-delay: 0ms"></span>
+                                <span class="animate-pulse" style="animation-delay: 150ms"></span>
+                                <span class="animate-pulse" style="animation-delay: 300ms"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="border-t border-gray-200 p-4 bg-gray-50">
+                    <form id="chat-form" class="flex space-x-2">
+                        <input 
+                            type="text" 
+                            id="user-input" 
+                            placeholder="Digite sua mensagem..." 
+                            class="flex-grow px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autocomplete="off"
+                        >
+                        <button 
+                            type="submit" 
+                            class="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors"
+                        >
+                            <i data-feather="send" class="w-5 h-5"></i>
+                        </button>
+                    </form>
+                    <div class="mt-2 text-xs text-gray-500 text-center">
+                        Este chatbot está integrado com Twilio e hospedado no Render
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white p-4 text-center text-sm">
+            <p>© 2023 Chatbot Empresarial. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize AOS and Feather Icons
+        AOS.init({
+            duration: 600,
+            easing: 'ease-in-out',
+            once: true
+        });
+        feather.replace();
+
+        // Chatbot functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatForm = document.getElementById('chat-form');
+            const userInput = document.getElementById('user-input');
+            const chatMessages = document.getElementById('chat-messages');
+            const typingIndicator = document.getElementById('typing-indicator');
+
+            // Sample responses
+            const responses = {
+                "oi": ["Olá! Como posso te ajudar?", "Oi! Em que posso ser útil hoje?"],
+                "horario": ["Nosso horário de funcionamento é de segunda a sexta, das 9h às 18h.", "Estamos abertos de segunda a sexta, das 9h às 18h."],
+                "contato": ["Você pode nos contatar pelo telefone (11) 1234-5678 ou email contato@empresa.com", "Nosso telefone é (11) 1234-5678 e email contato@empresa.com"],
+                "produtos": ["Oferecemos diversos produtos/serviços. Você pode conferir em nosso site www.empresa.com/produtos", "Nossos produtos estão disponíveis no site www.empresa.com/produtos"],
+                "suporte": ["Para suporte técnico, por favor envie um email para suporte@empresa.com ou ligue para (11) 9876-5432", "Entre em contato com nosso suporte pelo email suporte@empresa.com"],
+                "default": ["Desculpe, não entendi. Poderia reformular a pergunta?", "Não tenho essa informação no momento. Você pode tentar perguntar de outra forma?"]
+            };
+
+            // Add message to chat
+            function addMessage(message, isUser = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `mb-4 flex ${isUser ? 'justify-end' : 'justify-start'}`;
+                
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = `${isUser ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'} p-3 rounded-lg message-bubble`;
+                bubbleDiv.textContent = message;
+                
+                messageDiv.appendChild(bubbleDiv);
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // Get bot response
+            function getBotResponse(userMessage) {
+                const lowerMsg = userMessage.toLowerCase();
+                
+                if (lowerMsg.includes('oi') || lowerMsg.includes('olá')) {
+                    return responses["oi"][Math.floor(Math.random() * responses["oi"].length)];
+                } else if (lowerMsg.includes('horário') || lowerMsg.includes('funcionamento')) {
+                    return responses["horario"][Math.floor(Math.random() * responses["horario"].length)];
+                } else if (lowerMsg.includes('contato') || lowerMsg.includes('telefone') || lowerMsg.includes('email')) {
+                    return responses["contato"][Math.floor(Math.random() * responses["contato"].length)];
+                } else if (lowerMsg.includes('produto') || lowerMsg.includes('serviço')) {
+                    return responses["produtos"][Math.floor(Math.random() * responses["produtos"].length)];
+                } else if (lowerMsg.includes('suporte') || lowerMsg.includes('técnico')) {
+                    return responses["suporte"][Math.floor(Math.random() * responses["suporte"].length)];
+                } else {
+                    return responses["default"][Math.floor(Math.random() * responses["default"].length)];
+                }
+            }
+
+            // Handle form submission
+            chatForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const message = userInput.value.trim();
+                
+                if (message) {
+                    // Add user message
+                    addMessage(message, true);
+                    userInput.value = '';
+                    
+                    // Show typing indicator
+                    typingIndicator.classList.remove('hidden');
+                    chatMessages.appendChild(typingIndicator);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    // Simulate bot thinking
+                    setTimeout(() => {
+                        typingIndicator.classList.add('hidden');
+                        
+                        // Get and add bot response
+                        const botResponse = getBotResponse(message);
+                        addMessage(botResponse);
+                    }, 1500);
+                }
+            });
+
+            // Simulate initial bot message
+            setTimeout(() => {
+                addMessage("Estou aqui para responder suas dúvidas sobre nossa empresa. Fique à vontade para perguntar!");
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
