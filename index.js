@@ -3,8 +3,8 @@ import express from "express";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import { createClient } from "@supabase/supabase-js";
-import { OpenAI } from "openai";
 import Twilio from "twilio";
+import axios from "axios";
 
 dotenv.config();
 const app = express();
@@ -16,14 +16,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// -------------------- OpenAI --------------------
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 // -------------------- Twilio --------------------
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+
+// -------------------- Função Hugging Face --------------------
+async function gerarRespostaHF(prompt) {
+  try {
+    const res = await axios.post(
+      `https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct`,
+      { inputs: prompt },
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
+    );
+
+    // Ajuste caso o retorno seja diferente
+    if (res.data && res.data[0]?.generated_text) return res.data[0].generated_text;
+    return "🤖 Não consegui gerar resposta.";
+  } catch (err) {
+    console.error("Erro Hugging Face:", err.response?.data || err.message);
+    return "🤖 Ocorreu um erro ao gerar a resposta.";
+  }
+}
 
 // -------------------- Rotas --------------------
 
@@ -36,38 +49,69 @@ app.get("/", (req, res) => {
 app.post("/webhook", async (req, res) => {
   try {
     const msgFrom = req.body.From;
-    const msgBody = req.body.Body || req.body.body || "";
+    const msgBody = req.body.Body || "";
 
-    // Evita erro se msgBody estiver vazio
-    const emailMatch = msgBody ? msgBody.match(/[\w.-]+@[\w.-]+\.\w+/) : null;
-    const email = emailMatch ? emailMatch[0] : null;
+    // Pega ou cria lead
+    let { data: lead } = await supabase
+      .from("leads")
+      .select("*")
+      .eq("phone", msgFrom)
+      .single();
 
-    if (email) {
-      await supabase
+    if (!lead) {
+      const { data: newLead } = await supabase
         .from("leads")
         .insert({
           name: "Cliente WhatsApp",
           phone: msgFrom,
-          email: email,
-          message: msgBody
+          message: msgBody,
+          paid: false,
+          msg_count: 0,
+          last_msg_date: new Date().toISOString().split("T")[0]
         })
-        .onConflict("email")
-        .ignore();
+        .select()
+        .single();
+      lead = newLead;
     }
 
-    // Resposta GPT
-    const gptResponse = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: msgBody }],
-    });
+    // Reset diário
+    const hoje = new Date().toISOString().split("T")[0];
+    if (lead.last_msg_date !== hoje) {
+      await supabase
+        .from("leads")
+        .update({ msg_count: 0, last_msg_date: hoje })
+        .eq("id", lead.id);
+      lead.msg_count = 0;
+    }
 
-    const reply = gptResponse.choices[0].message.content;
+    // Verifica limite de mensagens
+    if (!lead.paid && lead.msg_count >= 10) {
+      await client.messages.create({
+        from: TWILIO_NUMBER,
+        to: msgFrom,
+        body:
+          "🚀 Você atingiu o limite diário de 10 mensagens grátis.\n\n" +
+          "👉 Para desbloquear uso ilimitado, faça o upgrade para o plano VIP: \n" +
+          process.env.MP_PAYMENT_LINK
+      });
+      return res.sendStatus(200);
+    }
 
+    // Resposta IA gratuita Hugging Face
+    const reply = await gerarRespostaHF(msgBody);
+
+    // Envia mensagem
     await client.messages.create({
       from: TWILIO_NUMBER,
       to: msgFrom,
       body: reply,
     });
+
+    // Atualiza contador
+    await supabase
+      .from("leads")
+      .update({ msg_count: (lead.msg_count || 0) + 1 })
+      .eq("id", lead.id);
 
     res.sendStatus(200);
   } catch (err) {
@@ -75,7 +119,6 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(500);
   }
 });
-
 
 // Webhook Mercado Pago
 app.post("/mp-webhook", async (req, res) => {
@@ -126,4 +169,3 @@ app.post("/mp-webhook", async (req, res) => {
 // -------------------- Servidor --------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
-
