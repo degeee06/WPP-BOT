@@ -5,13 +5,16 @@ import twilio from "twilio";
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Respostas fixas do bot
+// ================================
+// Respostas fixas (robusto para empresas)
+// ================================
 const responses = {
   "servicos": "Nossos serviços disponíveis são: Cromoterapia, Massagem Relaxante, Design de Unhas e Tratamentos Corporais.",
   "produto": "Temos diversos produtos disponíveis. Quer ver nosso catálogo?",
+  "catalogo": "Temos vários catálogos disponíveis:<br>- Catálogo de Produtos: [link]<br>- Catálogo de Serviços: [link]",
   "cromoterapia": "A cromoterapia utiliza cores para restaurar o equilíbrio energético do corpo. Sessões de 30 a 60 minutos.",
   "massagem": "Nossa massagem relaxante combina técnicas suecas e aromaterapia para aliviar tensões. Sessões de 50 ou 80 minutos.",
-  "unhas": "Oferecemos serviços de unhas: Alongamento, Manicure, Pedicure, Esmaltação em gel e Decoração artística. Pacotes mensais com desconto disponíveis.",
+  "unhas": "Serviços de unhas: Alongamento, Manicure, Pedicure, Esmaltação em gel e Decoração artística. Pacotes mensais com desconto disponíveis.",
   "preco": "Os preços variam conforme o produto ou serviço. Qual item você quer saber?",
   "desconto": "Temos promoções especiais esta semana! Produtos com até 30% de desconto e serviços com 10% off.",
   "pagamento": "Aceitamos várias formas de pagamento, incluindo PIX, cartão e boleto. Quer prosseguir com o pagamento?",
@@ -26,31 +29,56 @@ const responses = {
   "default": "Desculpe, não entendi. Poderia reformular sua pergunta?"
 };
 
+// ================================
+// Mapeamento de perguntas/vinculação de palavras-chave
+// ================================
+const keywords = [
+  { words: ["atendimento", "serviço", "servicos", "cromoterapia", "massagem", "unha", "unhas"], response: "servicos" },
+  { words: ["produto", "produtos"], response: "produto" },
+  { words: ["catalogo", "catálogo"], response: "catalogo" },
+  { words: ["cromoterapia", "cor", "cores"], response: "cromoterapia" },
+  { words: ["massagem", "relaxante", "relaxar"], response: "massagem" },
+  { words: ["unha", "unhas", "manicure", "pedicure"], response: "unhas" },
+  { words: ["preço", "precos", "valor", "valores"], response: "preco" },
+  { words: ["desconto", "promoção", "promocao", "oferta"], response: "desconto" },
+  { words: ["pagamento", "pagar", "pix"], response: "pix" },
+  { words: ["entrega", "prazo"], response: "entrega" },
+  { words: ["garantia"], response: "garantia" },
+  { words: ["contato", "telefone", "número", "numero"], response: "contato" },
+  { words: ["whatsapp"], response: "whatsapp" },
+  { words: ["ajuda", "suporte", "emergência", "emergencia"], response: "ajuda" },
+  { words: ["horário", "horario", "atendimento", "funcionamento"], response: "horario" },
+  { words: ["data", "dia", "hoje"], response: "data" },
+  // Adicione mais de 100 palavras-chave mapeadas aqui
+  { words: ["cromoterapia", "cores", "energia"], response: "cromoterapia" },
+  { words: ["massagem sueca", "aromaterapia"], response: "massagem" },
+  { words: ["alongamento", "esmaltação", "decoração"], response: "unhas" },
+  { words: ["cartão", "boleto", "pix"], response: "pagamento" },
+  { words: ["promoção especial", "oferta"], response: "desconto" },
+  { words: ["prazo de entrega"], response: "entrega" },
+  { words: ["garantia produtos", "garantia serviços"], response: "garantia" },
+  { words: ["falar com atendente", "contato humano"], response: "contato" }
+];
+
+// ================================
 // Função para processar mensagem recebida
+// ================================
 function getResponse(msg) {
   msg = msg.toLowerCase();
 
-  if (msg.includes("atendimento") || msg.includes("serviço") || msg.includes("servicos") || msg.includes("cromoterapia") || msg.includes("massagem") || msg.includes("unha")) return responses.servicos;
-  if (msg.includes("produto")) return responses.produto;
-  if (msg.includes("catálogo") || msg.includes("catalogo")) return responses.catalogo;
-  if (msg.includes("cromoterapia") || msg.includes("cor") || msg.includes("cores")) return responses.cromoterapia;
-  if (msg.includes("massagem") || msg.includes("relaxante") || msg.includes("relaxar")) return responses.massagem;
-  if (msg.includes("unha") || msg.includes("unhas") || msg.includes("manicure") || msg.includes("pedicure")) return responses.unhas;
-  if (msg.includes("preço") || msg.includes("valor")) return responses.preco;
-  if (msg.includes("desconto") || msg.includes("promoção") || msg.includes("promocao") || msg.includes("oferta")) return responses.desconto;
-  if (msg.includes("pagamento") || msg.includes("pagar") || msg.includes("pix")) return responses.pix;
-  if (msg.includes("entrega") || msg.includes("prazo")) return responses.entrega;
-  if (msg.includes("garantia")) return responses.garantia;
-  if (msg.includes("contato") || msg.includes("telefone") || msg.includes("número") || msg.includes("numero")) return responses.contato;
-  if (msg.includes("whatsapp")) return responses.whatsapp;
-  if (msg.includes("ajuda") || msg.includes("suporte") || msg.includes("emergência") || msg.includes("emergencia")) return responses.ajuda;
-  if (msg.includes("horário") || msg.includes("horario") || msg.includes("atendimento")) return responses.horario;
-  if (msg.includes("data") || msg.includes("dia")) return responses.data;
-
+  for (let key of keywords) {
+    for (let word of key.words) {
+      if (msg.includes(word)) {
+        return responses[key.response];
+      }
+    }
+  }
   return responses.default;
 }
 
+// ================================
 // Endpoint Twilio → WhatsApp
+// ================================
 app.post("/whatsapp", (req, res) => {
   const incomingMsg = req.body.Body || "";
   const reply = getResponse(incomingMsg);
@@ -62,7 +90,8 @@ app.post("/whatsapp", (req, res) => {
   res.end(twiml.toString());
 });
 
+// ================================
 // Inicia servidor
+// ================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🤖 Bot rodando na porta ${PORT}`));
-
