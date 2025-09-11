@@ -20,17 +20,20 @@ const supabase = createClient(
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 
-// -------------------- Função Hugging Face --------------------
+// -------------------- Hugging Face --------------------
 async function gerarRespostaHF(prompt) {
   try {
     const res = await axios.post(
-      `https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct`,
+      "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct",
       { inputs: prompt },
       { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
 
-    // Ajuste caso o retorno seja diferente
-    if (res.data && res.data[0]?.generated_text) return res.data[0].generated_text;
+    // Alguns modelos retornam array ou objeto
+    if (res.data?.generated_text) return res.data.generated_text;
+    if (Array.isArray(res.data) && res.data[0]?.generated_text)
+      return res.data[0].generated_text;
+
     return "🤖 Não consegui gerar resposta.";
   } catch (err) {
     console.error("Erro Hugging Face:", err.response?.data || err.message);
@@ -40,10 +43,8 @@ async function gerarRespostaHF(prompt) {
 
 // -------------------- Rotas --------------------
 
-// Rota principal para teste
-app.get("/", (req, res) => {
-  res.send("Bot rodando ✅");
-});
+// Teste do bot
+app.get("/", (req, res) => res.send("Bot rodando ✅"));
 
 // Webhook Twilio (WhatsApp)
 app.post("/webhook", async (req, res) => {
@@ -51,12 +52,19 @@ app.post("/webhook", async (req, res) => {
     const msgFrom = req.body.From;
     const msgBody = req.body.Body || "";
 
+    if (!msgFrom) {
+      console.error("Número do destinatário (msgFrom) não encontrado!");
+      return res.sendStatus(400);
+    }
+
     // Pega ou cria lead
     let { data: lead } = await supabase
       .from("leads")
       .select("*")
       .eq("phone", msgFrom)
-      .single();
+      .maybeSingle();
+
+    const hoje = new Date().toISOString().split("T")[0];
 
     if (!lead) {
       const { data: newLead } = await supabase
@@ -67,16 +75,16 @@ app.post("/webhook", async (req, res) => {
           message: msgBody,
           paid: false,
           msg_count: 0,
-          last_msg_date: new Date().toISOString().split("T")[0]
+          last_msg_date: hoje
         })
         .select()
         .single();
-      lead = newLead;
+      lead = newLead || { msg_count: 0, last_msg_date: hoje };
     }
 
     // Reset diário
-    const hoje = new Date().toISOString().split("T")[0];
-    if (lead.last_msg_date !== hoje) {
+    const lastMsgDate = lead.last_msg_date || hoje;
+    if (lastMsgDate !== hoje) {
       await supabase
         .from("leads")
         .update({ msg_count: 0, last_msg_date: hoje })
@@ -84,7 +92,7 @@ app.post("/webhook", async (req, res) => {
       lead.msg_count = 0;
     }
 
-    // Verifica limite de mensagens
+    // Limite diário para não-pagos
     if (!lead.paid && lead.msg_count >= 10) {
       await client.messages.create({
         from: TWILIO_NUMBER,
@@ -97,7 +105,7 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Resposta IA gratuita Hugging Face
+    // Resposta IA Hugging Face
     const reply = await gerarRespostaHF(msgBody);
 
     // Envia mensagem
@@ -124,9 +132,7 @@ app.post("/webhook", async (req, res) => {
 app.post("/mp-webhook", async (req, res) => {
   try {
     const tokenRecebido = req.query.token;
-    if (tokenRecebido !== process.env.MP_WEBHOOK_TOKEN) {
-      return res.status(403).send("Forbidden");
-    }
+    if (tokenRecebido !== process.env.MP_WEBHOOK_TOKEN) return res.status(403).send("Forbidden");
 
     const data = req.body;
 
@@ -141,13 +147,13 @@ app.post("/mp-webhook", async (req, res) => {
 
       if (error) console.error("Erro ao atualizar Supabase:", error);
 
-      // Envia mensagem de confirmação via WhatsApp
+      // Envia confirmação WhatsApp
       if (payerEmail) {
         const { data: lead } = await supabase
           .from("leads")
           .select("phone")
           .eq("email", payerEmail)
-          .single();
+          .maybeSingle();
 
         if (lead?.phone) {
           await client.messages.create({
@@ -167,5 +173,5 @@ app.post("/mp-webhook", async (req, res) => {
 });
 
 // -------------------- Servidor --------------------
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
