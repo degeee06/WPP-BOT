@@ -5,45 +5,97 @@ import twilio from "twilio";
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Respostas do bot (as mesmas do seu HTML)
+// -----------------------------
+// Respostas e menus do bot
+// -----------------------------
 const responses = {
-  "produto": "Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo?",
-  "catalogo": "Aqui está nosso catálogo: [link do catálogo]. Posso te ajudar com mais alguma coisa?",
-  "preço": "Os preços variam conforme o produto. Qual item você está interessado?",
-  "desconto": "Temos promoções especiais esta semana! Me diga qual produto te interessa.",
-  "pagamento": "Aceitamos várias formas de pagamento, incluindo PIX, cartão e boleto. Gostaria de prosseguir com o pagamento?",
-  "pix": "Vou preparar o pagamento via PIX para você...",
-  "entrega": "O prazo de entrega é de 3 a 5 dias úteis após a confirmação do pagamento.",
-  "garantia": "Todos nossos produtos possuem garantia de 12 meses contra defeitos de fabricação.",
-  "contato": "Você pode falar diretamente conosco pelo WhatsApp: (11) 99999-9999",
-  "whatsapp": "Nosso WhatsApp é (11) 99999-9999.",
-  "ajuda": "Precisa de ajuda imediata? Nosso time está disponível agora no WhatsApp.",
-  "horario": "Nosso horário de atendimento é de segunda a sábado, das 08:00 às 19:00 horas.",
-  "default": "Desculpe, não entendi. Poderia reformular sua pergunta?"
+  "menu_principal": `Olá! Escolha uma opção:
+1️⃣ Produtos
+2️⃣ Serviços
+3️⃣ Promoções
+4️⃣ Pagamento
+5️⃣ Contato/Atendimento humano`,
+  "produtos": `Temos diversos produtos disponíveis. Posso te mostrar nosso catálogo? [link do catálogo]`,
+  "servicos": `Nossos serviços disponíveis:
+- Cromoterapia
+- Massagem Relaxante
+- Design de Unhas
+Digite o serviço que deseja saber mais ou 'menu' para voltar.`,
+  "promocoes": `Temos promoções especiais esta semana! Produtos com até 30% OFF, serviços com 10% de desconto.`,
+  "pagamento": `Aceitamos PIX, cartão e boleto. Quer gerar pagamento via PIX?`,
+  "contato": `Você pode falar diretamente com nosso atendente pelo WhatsApp: https://wa.me/5511999999999`,
+  "default": `Desculpe, não entendi. Digite 'menu' para ver as opções disponíveis.`
 };
 
-// Função para processar mensagem recebida
-function getResponse(msg) {
-  msg = msg.toLowerCase();
+// -----------------------------
+// Armazena o estado de cada usuário
+// -----------------------------
+const userState = {}; // chave = número do WhatsApp
 
-  if (msg.includes("produto") || msg.includes("catálogo")) return responses.produto;
-  if (msg.includes("catalogo")) return responses.catalogo;
-  if (msg.includes("preço") || msg.includes("valor")) return responses.preço;
-  if (msg.includes("desconto") || msg.includes("promoção")) return responses.desconto;
-  if (msg.includes("pagamento") || msg.includes("pagar") || msg.includes("pix")) return responses.pix;
-  if (msg.includes("entrega") || msg.includes("prazo")) return responses.entrega;
-  if (msg.includes("garantia")) return responses.garantia;
-  if (msg.includes("contato") || msg.includes("whatsapp") || msg.includes("telefone") || msg.includes("número") || msg.includes("numero")) return responses.whatsapp;
-  if (msg.includes("ajuda") || msg.includes("suporte") || msg.includes("emergência") || msg.includes("emergencia")) return responses.ajuda;
-  if (msg.includes("horário") || msg.includes("horario") || msg.includes("atendimento") || msg.includes("funcionamento")) return responses.horario;
+// -----------------------------
+// Função para processar a mensagem
+// -----------------------------
+function getResponse(from, msg) {
+  msg = msg.toLowerCase().trim();
 
-  return responses.default;
+  // Se usuário pedir menu ou reset
+  if (msg === "menu") {
+    userState[from] = "menu_principal";
+    return responses.menu_principal;
+  }
+
+  // Checa estado atual do usuário
+  const state = userState[from] || "menu_principal";
+
+  switch (state) {
+    case "menu_principal":
+      if (msg === "1" || msg.includes("produto")) {
+        userState[from] = "produtos";
+        return responses.produtos;
+      } else if (msg === "2" || msg.includes("serviço") || msg.includes("servico")) {
+        userState[from] = "servicos";
+        return responses.servicos;
+      } else if (msg === "3" || msg.includes("promoção") || msg.includes("promocao")) {
+        userState[from] = "promocoes";
+        return responses.promocoes;
+      } else if (msg === "4" || msg.includes("pagamento")) {
+        userState[from] = "pagamento";
+        return responses.pagamento;
+      } else if (msg === "5" || msg.includes("contato") || msg.includes("atendimento")) {
+        userState[from] = "contato";
+        return responses.contato;
+      } else {
+        return responses.default;
+      }
+
+    case "produtos":
+    case "servicos":
+    case "promocoes":
+    case "pagamento":
+    case "contato":
+      // Sempre permite voltar ao menu principal
+      if (msg === "menu") {
+        userState[from] = "menu_principal";
+        return responses.menu_principal;
+      } else {
+        // Para qualquer outra mensagem, mantém o estado atual
+        return `Para voltar ao menu, digite 'menu'.`;
+      }
+
+    default:
+      userState[from] = "menu_principal";
+      return responses.menu_principal;
+  }
 }
 
+// -----------------------------
 // Endpoint do Twilio para WhatsApp
+// -----------------------------
 app.post("/whatsapp", (req, res) => {
   const incomingMsg = req.body.Body || "";
-  const reply = getResponse(incomingMsg);
+  const from = req.body.From || "";
+
+  const reply = getResponse(from, incomingMsg);
 
   const twiml = new twilio.twiml.MessagingResponse();
   twiml.message(reply);
@@ -52,6 +104,8 @@ app.post("/whatsapp", (req, res) => {
   res.end(twiml.toString());
 });
 
+// -----------------------------
 // Iniciar servidor
+// -----------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Bot rodando na porta ${PORT}`));
