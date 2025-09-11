@@ -14,21 +14,28 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // -------------------- Twilio --------------------
 const client = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const TWILIO_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+const TWILIO_NUMBER = "whatsapp:+14155238886"; // Sandbox Twilio WhatsApp
 
-// -------------------- Hugging Face GPT-OSS-20B --------------------
+// -------------------- Hugging Face --------------------
 async function gerarResposta(prompt) {
   try {
     const res = await axios.post(
-      "https://api-inference.huggingface.co/models/openai/gpt-oss-20b",
+      'https://api-inference.huggingface.co/models/gpt2', // modelo leve gratuito
       { inputs: prompt },
-      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` }, timeout: 30000 }
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
-    console.log("Resposta HF raw:", res.data);
-    return res.data[0]?.generated_text || "🤖 Não consegui gerar resposta.";
+
+    // Retorno pode variar dependendo do modelo
+    if (Array.isArray(res.data) && res.data[0]?.generated_text) {
+      return res.data[0].generated_text;
+    } else if (res.data?.generated_text) {
+      return res.data.generated_text;
+    } else {
+      return 'Não consegui entender sua mensagem.';
+    }
   } catch (err) {
-    console.error("Erro Hugging Face:", err.response?.data || err.message);
-    return "🤖 Ocorreu um erro ao gerar a resposta.";
+    console.error('Erro ao gerar resposta:', err.response?.data || err.message);
+    return 'Ocorreu um erro ao processar sua solicitação.';
   }
 }
 
@@ -44,7 +51,7 @@ app.post("/webhook", async (req, res) => {
 
     if (!msgFrom) return res.sendStatus(400);
 
-    // Gera resposta via GPT-OSS-20B
+    // Gera resposta via Hugging Face
     const reply = await gerarResposta(msgBody);
 
     // Envia mensagem de volta
